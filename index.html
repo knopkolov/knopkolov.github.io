@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Бесполезный сайт</title>
+
+<!-- GA4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX');
+</script>
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #fff;
+    user-select: none;
+  }
+
+  #game {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  #mainButton {
+    position: absolute;
+    padding: 14px 20px;
+    font-size: 18px;
+    background: #00c853;
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  #workButton {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 18px;
+    font-size: 16px;
+    background: #d50000;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  #message {
+    position: fixed;
+    top: 15px;
+    width: 100%;
+    text-align: center;
+    font-size: 20px;
+    opacity: 0.9;
+  }
+
+  #stats {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    font-size: 20px;
+  }
+</style>
+</head>
+<body>
+
+<div id="game">
+  <div id="message">Жмякай сюда</div>
+  <button id="mainButton">Жмякай сюда</button>
+  <button id="workButton">Я готов идти работать</button>
+</div>
+
+<div id="stats"></div>
+
+<script>
+  const mainButton = document.getElementById('mainButton');
+  const workButton = document.getElementById('workButton');
+  const message = document.getElementById('message');
+  const stats = document.getElementById('stats');
+
+  let totalClicks = 0;
+  let successClicks = 0;
+  let startTime = Date.now();
+
+  /* ---------- ЗВУК ---------- */
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  function playSound(type) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    if (type === 'miss') {
+      osc.frequency.value = 120;
+      gain.gain.value = 0.15;
+      osc.type = 'square';
+    } else {
+      osc.frequency.value = 520;
+      gain.gain.value = 0.2;
+      osc.type = 'triangle';
+    }
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.12);
+  }
+
+  /* ---------- УНИЖЕНИЯ ---------- */
+  const insults = [
+    "Не попал 🤡",
+    "Мимо",
+    "Совсем рядом… нет",
+    "Компьютер быстрее тебя",
+    "Мышка плачет",
+    "Это было больно смотреть",
+    "Ты вообще стараешься?",
+    "Кнопка увернулась",
+    "Алгоритм смеётся",
+    "UX-дизайнер уволился",
+    "Скилл не найден",
+    "Рука дрогнула",
+    "Может, другой рукой?",
+    "Почти… шутка",
+    "Судьба против тебя",
+    "Мышка не согласна",
+    "Ты нажал, но не туда",
+    "Кнопка издевательски молчит",
+    "Это было самоуверенно",
+    "Не сегодня",
+    "Попробуй глазами",
+    "Фокус потерян",
+    "Координация покинула чат",
+    "Ты жмёшь, она смеётся",
+    "Промах века",
+    "Руки из CSS",
+    "Кнопка живёт своей жизнью",
+    "Скорость есть — точности нет",
+    "Сомнительное решение",
+    "Неплохо. Плохо.",
+    "Мышка устала",
+    "Нейросеть расстроена",
+    "Ты уверен, что это кнопка?",
+    "Палец не согласован",
+    "Это был оптимистичный клик",
+    "Кнопка ушла за хлебом",
+    "Сегодня не твой день",
+    "Мимо, но с энтузиазмом",
+    "Слишком самонадеянно",
+    "UX — это не твоё"
+  ];
+
+  function randomInsult() {
+    return insults[Math.floor(Math.random() * insults.length)];
+  }
+
+  /* ---------- ЛОГИКА ---------- */
+
+  function moveButton() {
+    const padding = 20;
+    const maxX = window.innerWidth - mainButton.offsetWidth - padding;
+    const maxY = window.innerHeight - mainButton.offsetHeight - padding - 80;
+
+    mainButton.style.left = Math.random() * maxX + 'px';
+    mainButton.style.top = Math.random() * maxY + 'px';
+  }
+
+  // Любой клик = попытка
+  document.body.addEventListener('click', () => {
+    totalClicks++;
+    message.textContent = randomInsult();
+    playSound('miss');
+  });
+
+  // Наведение — кнопка убегает
+  mainButton.addEventListener('mouseenter', moveButton);
+
+  // Попадание
+  mainButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    successClicks++;
+    message.textContent = "Молодец! Сможешь ещё?";
+    playSound('success');
+    gtag('event', 'success_click');
+    moveButton();
+  });
+
+  // Склонение минут
+  function formatMinutes(m) {
+    if (m % 10 === 1 && m % 100 !== 11) return "минута";
+    if ([2,3,4].includes(m % 10) && ![12,13,14].includes(m % 100)) return "минуты";
+    return "минут";
+  }
+
+  workButton.addEventListener('click', (e) => {
+    e.stopPropagation();
+
+    const secondsTotal = Math.floor((Date.now() - startTime) / 1000);
+    const minutes = Math.floor(secondsTotal / 60);
+    const seconds = secondsTotal % 60;
+
+    stats.innerHTML = `
+      <div>
+        <h2>Статистика</h2>
+        <p>МИМО: ${totalClicks}</p>
+        <p>ПОПАЛ: ${successClicks}</p>
+        <p>Ты бесполезно потратил ${minutes} ${formatMinutes(minutes)}, ${seconds} секунд</p>
+        <p style="margin-top:20px;opacity:0.6">Кликни куда угодно, чтобы начать заново</p>
+      </div>
+    `;
+
+    stats.style.display = 'flex';
+
+    gtag('event', 'show_stats', {
+      total_clicks: totalClicks,
+      success_clicks: successClicks,
+      session_seconds: secondsTotal
+    });
+  });
+
+  stats.addEventListener('click', () => {
+    stats.style.display = 'none';
+    totalClicks = 0;
+    successClicks = 0;
+    startTime = Date.now();
+    message.textContent = "Жмякай сюда";
+    moveButton();
+  });
+
+  moveButton();
+</script>
+
+</body>
+</html>
