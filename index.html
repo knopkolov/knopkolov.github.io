@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <!-- Yandex.Metrika counter -->
+    <!-- Yandex.Metrika counter -->
 <script type="text/javascript">
     (function(m,e,t,r,i,k,a){
         m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
@@ -47,12 +47,13 @@
 
   #mainButton {
     position: absolute;
-    padding: 14px 20px;
-    font-size: 18px;
-    background: #00c853;
+    width: 120px;
+    height: 120px;
+    font-size: 16px;
+    background: #ffeb3b;
     color: #000;
     border: none;
-    border-radius: 8px;
+    border-radius: 50%;
     cursor: pointer;
     touch-action: manipulation;
   }
@@ -96,127 +97,159 @@
 <body>
 
 <div id="game">
-  <div id="message">Жмякай сюда</div>
-  <button id="mainButton">Жмякай сюда</button>
+  <div id="message">Жмякай</div>
+  <button id="mainButton">Жмякай</button>
   <button id="workButton">Я готов идти работать</button>
 </div>
 
 <div id="stats"></div>
 
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+
   const mainButton = document.getElementById('mainButton');
   const workButton = document.getElementById('workButton');
   const message = document.getElementById('message');
   const stats = document.getElementById('stats');
 
-  let totalClicks = 0;
+  let missClicks = 0;
   let successClicks = 0;
   let startTime = Date.now();
 
-  /* ---------- ЗВУК ---------- */
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  /* ---------- AUDIO ---------- */
+  let audioCtx = null;
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
 
   function playSound(type) {
+    if (!audioCtx) return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-
     osc.connect(gain);
     gain.connect(audioCtx.destination);
 
-    if (type === 'miss') {
-      osc.frequency.value = 120;
-      gain.gain.value = 0.15;
-      osc.type = 'square';
-    } else {
-      osc.frequency.value = 520;
-      gain.gain.value = 0.2;
-      osc.type = 'triangle';
-    }
+    osc.frequency.value = type === 'miss' ? 120 : 520;
+    osc.type = type === 'miss' ? 'square' : 'triangle';
+    gain.gain.value = type === 'miss' ? 0.15 : 0.2;
 
     osc.start();
     osc.stop(audioCtx.currentTime + 0.12);
   }
 
-  /* ---------- УНИЖЕНИЯ ---------- */
+  /* ---------- RECORDS ---------- */
+  const records = {
+    maxHits: Number(localStorage.getItem('maxHits')) || 0,
+    maxTime: Number(localStorage.getItem('maxTime')) || 0,
+    bestAccuracy: Number(localStorage.getItem('bestAccuracy')) || 0
+  };
+
+  function saveRecords(seconds) {
+    const attempts = missClicks + successClicks;
+    const accuracy = attempts === 0 ? 0 : successClicks / attempts;
+
+    if (successClicks > records.maxHits) {
+      records.maxHits = successClicks;
+      localStorage.setItem('maxHits', records.maxHits);
+    }
+
+    if (seconds > records.maxTime) {
+      records.maxTime = seconds;
+      localStorage.setItem('maxTime', records.maxTime);
+    }
+
+    if (accuracy > records.bestAccuracy) {
+      records.bestAccuracy = accuracy;
+      localStorage.setItem('bestAccuracy', records.bestAccuracy);
+    }
+  }
+
+  /* ---------- INSULTS ---------- */
   const insults = [
-    "Не попал 🤡",
-    "Мимо",
-    "Совсем рядом… нет",
-    "Компьютер быстрее тебя",
-    "Мышка плачет",
-    "Это было больно смотреть",
-    "Ты вообще стараешься?",
-    "Кнопка увернулась",
-    "Алгоритм смеётся",
-    "UX-дизайнер уволился",
-    "Скилл не найден",
-    "Рука дрогнула",
-    "Может, другой рукой?",
-    "Почти… шутка",
-    "Судьба против тебя",
-    "Мышка не согласна",
-    "Ты нажал, но не туда",
-    "Кнопка издевательски молчит",
-    "Это было самоуверенно",
-    "Не сегодня",
-    "Попробуй глазами",
-    "Фокус потерян",
-    "Координация покинула чат",
-    "Ты жмёшь, она смеётся",
-    "Промах века",
-    "Руки из CSS",
-    "Кнопка живёт своей жизнью",
-    "Скорость есть — точности нет",
-    "Сомнительное решение",
-    "Неплохо. Плохо.",
-    "Мышка устала",
-    "Нейросеть расстроена",
-    "Ты уверен, что это кнопка?",
-    "Палец не согласован",
-    "Это был оптимистичный клик",
-    "Кнопка ушла за хлебом",
-    "Сегодня не твой день",
-    "Мимо, но с энтузиазмом",
-    "Слишком самонадеянно",
-    "UX — это не твоё"
+    "Мимо", "Не попал 🤡", "Руки из CSS", "UX умер",
+    "Кнопка смеётся", "Скилл не найден", "Промах века",
+    "Мышка плачет", "Алгоритм против тебя",
+    "Это было оптимистично", "Не сегодня",
+    "Координация ушла", "Фокус потерян",
+    "Ты вообще стараешься?", "Почти. Нет.",
+    "Судьба отвернулась", "Кнопка живёт своей жизнью"
   ];
 
-  function randomInsult() {
-    return insults[Math.floor(Math.random() * insults.length)];
+  const randomInsult = () =>
+    insults[Math.floor(Math.random() * insults.length)];
+
+  /* ---------- FLOATING ---------- */
+  let posX = 100, posY = 100;
+  let velX = 1.2, velY = 1.1;
+
+  function animate() {
+    const maxX = window.innerWidth - mainButton.offsetWidth;
+    const maxY = window.innerHeight - mainButton.offsetHeight - 80;
+
+    posX += velX;
+    posY += velY;
+
+    if (posX <= 0 || posX >= maxX) velX *= -1;
+    if (posY <= 0 || posY >= maxY) velY *= -1;
+
+    mainButton.style.left = posX + 'px';
+    mainButton.style.top = posY + 'px';
+
+    requestAnimationFrame(animate);
   }
 
-  /* ---------- ЛОГИКА ---------- */
+  /* ---------- HOVER (20%) ---------- */
+  mainButton.addEventListener('mouseenter', () => {
+    if (Math.random() > 0.2) return;
 
-  function moveButton() {
-    const padding = 20;
-    const maxX = window.innerWidth - mainButton.offsetWidth - padding;
-    const maxY = window.innerHeight - mainButton.offsetHeight - padding - 80;
+    const diameter = mainButton.offsetWidth;
+    const shift = diameter * 3;
 
-    mainButton.style.left = Math.random() * maxX + 'px';
-    mainButton.style.top = Math.random() * maxY + 'px';
-  }
+    const angle = Math.random() * Math.PI * 2;
+    posX += Math.cos(angle) * shift;
+    posY += Math.sin(angle) * shift;
 
-  // Любой клик = попытка
+    const maxX = window.innerWidth - diameter;
+    const maxY = window.innerHeight - diameter - 80;
+
+    posX = Math.max(0, Math.min(maxX, posX));
+    posY = Math.max(0, Math.min(maxY, posY));
+  });
+
+  /* ---------- CLICKS ---------- */
   document.body.addEventListener('click', () => {
-    totalClicks++;
+    initAudio();
+    missClicks++;
     message.textContent = randomInsult();
     playSound('miss');
   });
 
-  // Наведение — кнопка убегает
-  mainButton.addEventListener('mouseenter', moveButton);
-
-  // Попадание
   mainButton.addEventListener('click', (e) => {
     e.stopPropagation();
+    initAudio();
     successClicks++;
+
     message.textContent = "Молодец! Сможешь ещё?";
     playSound('success');
-    gtag('event', 'success_click');
-    moveButton();
+
+    const size = Math.max(10, mainButton.offsetWidth * 0.9);
+    mainButton.style.width = size + 'px';
+    mainButton.style.height = size + 'px';
+
+    const currentFont = parseFloat(mainButton.style.fontSize || 16);
+    mainButton.style.fontSize = Math.max(0, currentFont * 0.85) + 'px';
+
+    mainButton.style.background = '#00c853';
+    setTimeout(() => {
+      mainButton.style.background = '#ffeb3b';
+    }, 150);
+
+    velX *= 1.15;
+    velY *= 1.15;
   });
 
-  // Склонение минут
   function formatMinutes(m) {
     if (m % 10 === 1 && m % 100 !== 11) return "минута";
     if ([2,3,4].includes(m % 10) && ![12,13,14].includes(m % 100)) return "минуты";
@@ -225,44 +258,45 @@
 
   workButton.addEventListener('click', (e) => {
     e.stopPropagation();
+    const seconds = Math.floor((Date.now() - startTime) / 1000);
+    saveRecords(seconds);
 
-    const secondsTotal = Math.floor((Date.now() - startTime) / 1000);
-    const minutes = Math.floor(secondsTotal / 60);
-    const seconds = secondsTotal % 60;
+    const attempts = missClicks + successClicks;
+    const accuracy = attempts === 0 ? 0 : (successClicks / attempts) * 100;
 
     stats.innerHTML = `
       <div>
         <h2>Статистика</h2>
-        <p>МИМО: ${totalClicks}</p>
+        <p>МИМО: ${missClicks}</p>
         <p>ПОПАЛ: ${successClicks}</p>
-        <p>Ты бесполезно потратил ${minutes} ${formatMinutes(minutes)}, ${seconds} секунд</p>
-        <p style="margin-top:20px;opacity:0.6">Кликни куда угодно, чтобы начать заново</p>
+        <p>Точность: ${accuracy.toFixed(1)}%</p>
+        <hr>
+        <h3>🏆 Рекорды</h3>
+        <p>Макс. попаданий: ${records.maxHits}</p>
+        <p>
+          Рекорд времени:
+          ${Math.floor(records.maxTime/60)} ${formatMinutes(Math.floor(records.maxTime/60))},
+          ${records.maxTime % 60} секунд
+        </p>
+        <p>Лучшая точность: ${(records.bestAccuracy * 100).toFixed(1)}%</p>
+        <hr>
+        <p>
+          Ты бесполезно потратил
+          ${Math.floor(seconds/60)} ${formatMinutes(Math.floor(seconds/60))},
+          ${seconds % 60} секунд
+        </p>
+        <p style="opacity:.6">Кликни куда угодно, чтобы начать заново</p>
       </div>
     `;
 
     stats.style.display = 'flex';
-
-    gtag('event', 'show_stats', {
-      total_clicks: totalClicks,
-      success_clicks: successClicks,
-      session_seconds: secondsTotal
-    });
   });
 
-  stats.addEventListener('click', () => {
-    stats.style.display = 'none';
-    totalClicks = 0;
-    successClicks = 0;
-    startTime = Date.now();
-    message.textContent = "Жмякай сюда";
-    moveButton();
-  });
+  stats.addEventListener('click', () => location.reload());
 
-  moveButton();
+  animate();
+});
 </script>
 
 </body>
 </html>
-
-
-
